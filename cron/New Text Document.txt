@@ -1,0 +1,84 @@
+@echo off
+cd /d C:\xampp\htdocs\leave-management\cron
+C:\xampp\php\php.exe send_resumption_reminders.php
+```
+
+3. **Save as:** `run_resumption_reminders.bat`
+4. **Save location:** `C:\xampp\htdocs\leave-management\cron\`
+5. **Save as type:** "All Files"
+
+### **B. Open Task Scheduler**
+
+1. Press **Windows + R**
+2. Type: `taskschd.msc`
+3. Press **Enter**
+
+### **C. Create New Task**
+
+1. Click **"Create Basic Task"** (right panel)
+2. **Name:** `Leave Resumption Reminders`
+3. **Description:** `Sends daily email reminders for employees resuming from leave`
+4. Click **Next**
+
+### **D. Set When to Run**
+
+1. Select **"Daily"**
+2. Click **Next**
+3. **Start:** Today's date
+4. **Time:** `08:00:00 AM` (or your preferred time)
+5. **Recur every:** `1 days`
+6. Click **Next**
+
+### **E. Set What to Run**
+
+1. Select **"Start a program"**
+2. Click **Next**
+3. **Program/script:** Browse and select:
+```
+   C:\xampp\htdocs\leave-management\cron\run_resumption_reminders.bat
+```
+4. Click **Next**
+5. Click **Finish**
+
+### **F. Test the Task**
+
+1. In Task Scheduler, find **"Leave Resumption Reminders"**
+2. Right-click → **Run**
+3. Check the log file to confirm it ran
+
+---
+
+## **✅ Step 5: Verify Everything Works**
+
+### **Daily Checklist:**
+
+**Day 1 (3 days before resumption):**
+- [ ] Script runs at 8 AM
+- [ ] Employee receives "3 days" email (Blue)
+- [ ] HOD receives "3 days" email
+- [ ] HR receives "3 days" email
+
+**Day 2 (2 days before resumption):**
+- [ ] Script runs at 8 AM
+- [ ] Employee receives "2 days" email (Yellow)
+- [ ] HOD receives "2 days" email
+- [ ] HR receives "2 days" email
+
+**Day 3 (1 day before resumption):**
+- [ ] Script runs at 8 AM
+- [ ] Employee receives "TOMORROW" email (Red/Urgent)
+- [ ] HOD receives "TOMORROW" email
+- [ ] HR receives "TOMORROW" email
+
+---
+
+## **📊 Monitoring & Troubleshooting**
+
+### **Check if Task Ran:**
+1. Open Task Scheduler
+2. Find "Leave Resumption Reminders"
+3. Check **"Last Run Time"** and **"Last Run Result"**
+
+### **Check Log File:**
+```
+C:\xampp\htdocs\leave-management\cron\resumption_reminders.log

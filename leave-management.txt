@@ -1,0 +1,24 @@
+leave-management/
+├── config/
+│   ├── database.php
+│   └── email_notifications.php ← Email system
+├── vendor/
+│   └── phpmailer/ ← Email library
+├── employee/
+│   ├── index.php
+│   └── submit_leave.php ← Sends email to HOD
+├── hod/
+│   ├── login.php
+│   ├── index.php
+│   └── review_request.php ← Sends emails to HR/Employee
+├── hr/
+│   ├── login.php
+│   ├── index.php
+│   ├── manage_employees.php
+│   ├── all_requests.php
+│   ├── review_request.php ← Sends final emails
+│   ├── manage_leave_types.php
+│   ├── reports.php
+│   └── settings.php
+├── login.php
+└── logout.php

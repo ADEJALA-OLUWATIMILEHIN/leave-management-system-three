@@ -1,0 +1,17 @@
+[2026-03-31 14:38:38] ========== Script Started ==========
+[2026-03-31 14:38:38] Today's date: 2026-03-31
+[2026-03-31 14:38:38] Checking for leave ending on: 2026-04-01, 2026-04-02, or 2026-04-03
+[2026-03-31 14:38:38] ERROR: Database query failed - Array
+(
+    [0] => Array
+        (
+            [0] => 42S22
+            [SQLSTATE] => 42S22
+            [1] => 207
+            [code] => 207
+            [2] => [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'ManagerID'.
+            [message] => [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]Invalid column name 'ManagerID'.
+        )
+
+)
+
