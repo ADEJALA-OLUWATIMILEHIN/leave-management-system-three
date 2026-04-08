@@ -91,8 +91,8 @@
         }
         
         .company-logo {
-            width: 40px;
-            height: 40px;
+            width: 60px;
+            height: 60px;
             background: linear-gradient(135deg, #1e3c72, #2a5298);
             border-radius: 12px;
             display: flex;
@@ -147,8 +147,8 @@
         /* Portal Cards */
         .portals-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
             margin-bottom: 50px;
         }
         
@@ -156,7 +156,7 @@
             background: rgba(255, 255, 255, 0.98);
             backdrop-filter: blur(10px);
             border-radius: 20px;
-            padding: 40px;
+            padding: 35px;
             text-align: center;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
             transition: all 0.3s ease;
@@ -174,15 +174,15 @@
         }
         
         .portal-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 25px;
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 20px;
             background: linear-gradient(135deg, #1e3c72, #2a5298);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
+            font-size: 36px;
             transition: 0.3s;
         }
         
@@ -202,29 +202,34 @@
             background: linear-gradient(135deg, #4facfe, #00f2fe);
         }
         
+        .portal-card.finance .portal-icon {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+        
         .portal-card h3 {
             color: #1e3c72;
-            font-size: 24px;
-            margin-bottom: 12px;
+            font-size: 22px;
+            margin-bottom: 10px;
             font-weight: 700;
         }
         
         .portal-card p {
             color: #666;
-            font-size: 15px;
+            font-size: 14px;
             line-height: 1.6;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
         
         .portal-card .btn {
             display: inline-block;
-            padding: 12px 30px;
+            padding: 10px 25px;
             background: linear-gradient(135deg, #1e3c72, #2a5298);
             color: white;
             border-radius: 8px;
             font-weight: 600;
             transition: 0.3s;
             text-decoration: none;
+            font-size: 14px;
         }
         
         .portal-card:hover .btn {
@@ -250,7 +255,7 @@
         
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
             gap: 25px;
         }
         
@@ -267,7 +272,7 @@
         .feature-item h4 {
             color: #1e3c72;
             margin-bottom: 10px;
-            font-size: 18px;
+            font-size: 17px;
         }
         
         .feature-item p {
@@ -327,9 +332,7 @@
     <!-- Header -->
     <div class="header">
         <div class="header-content">
-            <img src="/leave-management/sterling_logo_2.png" 
-     alt="Sterling Assurance"
-     style="width: 10%; height: 10%; object-fit: contain;">
+            <div class="company-logo">🏢</div>
             <div class="company-info">
                 <h1>Sterling Assurance Nigeria Limited</h1>
                 <p>Leave Management System</p>
@@ -348,27 +351,35 @@
         <!-- Portal Cards -->
         <div class="portals-grid">
             <!-- Employee Portal -->
-            <a href="employee/index.php" class="portal-card employee">
+            <a href="login.php" class="portal-card employee">
                 <div class="portal-icon">👤</div>
                 <h3>Employee Portal</h3>
-                <p>Apply for leave, view leave balance, track leave requests, and manage your leave allowance payments</p>
-                <span class="btn">Access Employee Portal →</span>
+                <p>Apply for leave, view balance, and track requests</p>
+                <span class="btn">Access Portal →</span>
             </a>
             
             <!-- HOD Portal -->
             <a href="hod/login.php" class="portal-card hod">
                 <div class="portal-icon">👔</div>
                 <h3>HOD Portal</h3>
-                <p>Review and approve leave requests from your team members and manage departmental leave schedules</p>
-                <span class="btn">Access HOD Portal →</span>
+                <p>Review and approve team leave requests</p>
+                <span class="btn">Access Portal →</span>
             </a>
             
             <!-- HR Portal -->
             <a href="hr/login.php" class="portal-card hr">
                 <div class="portal-icon">🏢</div>
                 <h3>HR Portal</h3>
-                <p>Manage employees, approve leave requests, track payments, generate reports, and oversee the entire system</p>
-                <span class="btn">Access HR Portal →</span>
+                <p>Manage employees and oversee system</p>
+                <span class="btn">Access Portal →</span>
+            </a>
+            
+            <!-- Finance Portal -->
+            <a href="finance/login.php" class="portal-card finance">
+                <div class="portal-icon">💰</div>
+                <h3>Finance Portal</h3>
+                <p>Process leave allowance payments</p>
+                <span class="btn">Access Portal →</span>
             </a>
         </div>
         
@@ -378,33 +389,33 @@
             <div class="features-grid">
                 <div class="feature-item">
                     <div class="icon">📝</div>
-                    <h4>Easy Leave Application</h4>
-                    <p>Simple and intuitive leave request process</p>
+                    <h4>Easy Application</h4>
+                    <p>Simple leave request process</p>
                 </div>
                 <div class="feature-item">
                     <div class="icon">⚡</div>
                     <h4>Quick Approvals</h4>
-                    <p>Two-stage approval workflow (HOD & HR)</p>
+                    <p>Two-stage approval workflow</p>
                 </div>
                 <div class="feature-item">
                     <div class="icon">💰</div>
                     <h4>Payment Tracking</h4>
-                    <p>Track annual leave allowance payments</p>
+                    <p>Annual leave allowance payments</p>
                 </div>
                 <div class="feature-item">
                     <div class="icon">📧</div>
                     <h4>Email Notifications</h4>
-                    <p>Automated reminders and confirmations</p>
+                    <p>Automated reminders</p>
                 </div>
                 <div class="feature-item">
                     <div class="icon">📊</div>
                     <h4>Reports & Analytics</h4>
-                    <p>Comprehensive leave reports and exports</p>
+                    <p>Comprehensive reports</p>
                 </div>
                 <div class="feature-item">
                     <div class="icon">🔒</div>
                     <h4>Secure & Reliable</h4>
-                    <p>Role-based access control system</p>
+                    <p>Role-based access control</p>
                 </div>
             </div>
         </div>
@@ -413,7 +424,7 @@
     <!-- Footer -->
     <div class="footer">
         <p><strong>Sterling Assurance Nigeria Limited</strong></p>
-        <p>IT Department | Leave Management System</p>
+        <p>IT Department | Leave Management System v1.0</p>
         <p><a href="https://www.sterlingassure.com/" target="_blank">www.sterlingassure.com</a></p>
         <p style="margin-top: 20px; font-size: 12px; opacity: 0.8;">
             © <?php echo date('Y'); ?> Sterling Assurance Nigeria Limited. All rights reserved.

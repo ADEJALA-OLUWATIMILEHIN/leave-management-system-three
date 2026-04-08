@@ -342,7 +342,7 @@ $message = get_message();
                 <div class="number"><?php echo $stats['Rejected'] ?? 0; ?></div>
             </div>
             <div class="stat-card success">
-                <h3>💰 Total Allowance</h3>
+                <h3>Total Allowance</h3>
                 <div class="number" style="font-size: 24px;">₦<?php echo number_format($payment_stats['TotalAmount'] ?? 0, 2); ?></div>
             </div>
         </div>

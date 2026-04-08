@@ -1,328 +1,334 @@
 <?php
 /**
- * Manage Employees - HR Admin
- * Leave Management System
+ * Manage Employees - HR Portal
+ * Add / Edit employees including Finance role & Salary
  */
 
 require_once __DIR__ . '/../config/database.php';
 
-// Check if user is logged in and is HR
 if (!is_logged_in() || !is_hr()) {
-    redirect('login.php');
+    redirect('../login.php');
 }
 
-$user_name = $_SESSION['name'];
+$message      = '';
+$message_type = '';
 
-// Handle Add/Edit/Deactivate Employee
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action'])) {
-        $action = $_POST['action'];
-        
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_employee'])) {
-    $first_name = sanitize_input($_POST['first_name']);
-    $last_name = sanitize_input($_POST['last_name']);
-    $email = sanitize_input($_POST['email']);
-    $phone = sanitize_input($_POST['phone']);
-    $department = sanitize_input($_POST['department']);
-    $role = $_POST['role'];
-    $salary = floatval($_POST['salary']);
-    $annual_leave_allowance = floatval($_POST['annual_leave_allowance']); // NEW
-    
-    // Generate employee number
-    $employee_number = 'EMP' . date('Y') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
-    
-    // Hash default password
-    $default_password = 'password123';
-    $hashed_password = password_hash($default_password, PASSWORD_DEFAULT);
-    
-    $sql = "INSERT INTO Users 
-            (Email, Password, FirstName, LastName, PhoneNumber, Department, Role, 
-             EmployeeNumber, Salary, AnnualLeaveAllowance, IsActive, MustChangePassword, CreatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, GETDATE())";
-    
-    $params = array(
-        $email, 
-        $hashed_password, 
-        $first_name, 
-        $last_name, 
-        $phone, 
-        $department, 
-        $role, 
-        $employee_number, 
-        $salary,
-        $annual_leave_allowance  // NEW
-    );
-    
-    $stmt = sqlsrv_query($conn, $sql, $params);
-    
-    if ($stmt) {
-        set_message('Employee added successfully! Default password: password123', 'success');
-    } else {
-        set_message('Error adding employee: ' . print_r(sqlsrv_errors(), true), 'error');
+// ── DELETE employee ──────────────────────────────────────────────────────────
+if (isset($_GET['delete'])) {
+    $del_id   = (int)$_GET['delete'];
+    $del_sql  = "UPDATE Users SET IsActive = 0 WHERE UserID = ? AND Role = 'employee'";
+    $del_stmt = sqlsrv_query($conn, $del_sql, array($del_id));
+    if ($del_stmt) {
+        set_message('Employee deactivated successfully.', 'success');
     }
-    
     redirect('manage_employees.php');
 }
-            
-            if ($insert_stmt) {
-                // Get the newly created UserID
-                $new_user_id = null;
-                $id_sql = "SELECT UserID FROM Users WHERE Email = ?";
-                $id_stmt = sqlsrv_query($conn, $id_sql, array($email));
-                if ($id_row = sqlsrv_fetch_array($id_stmt, SQLSRV_FETCH_ASSOC)) {
-                    $new_user_id = $id_row['UserID'];
-                }
-                
-                // If this is an employee (not HOD), assign leave balances
-                if ($role === 'employee' && $new_user_id) {
-                    $current_year = date('Y');
-                    
-                    $balance_sql = "
-                        INSERT INTO LeaveBalances (UserID, LeaveTypeID, Year, TotalDays, UsedDays, RemainingDays)
-                        SELECT ?, LeaveTypeID, ?, MaxDaysPerYear, 0, MaxDaysPerYear
-                        FROM LeaveTypes
-                        WHERE IsActive = 1
-                    ";
-                    
-                    sqlsrv_query($conn, $balance_sql, array($new_user_id, $current_year));
-                }
-                
-                set_message('Employee added successfully! Default password: password123 - User will be required to change password on first login.', 'success');
-            } else {
-                set_message('Failed to add employee.', 'error');
-            }
-            redirect('manage_employees.php');
+
+// ── ADD / EDIT employee ──────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action          = $_POST['action'] ?? 'add';
+    $first_name      = sanitize_input($_POST['first_name']);
+    $last_name       = sanitize_input($_POST['last_name']);
+    $email           = sanitize_input($_POST['email']);
+    $department      = sanitize_input($_POST['department']);
+    $role            = sanitize_input($_POST['role']);
+    $employee_number = sanitize_input($_POST['employee_number']);
+    $salary          = (float)($_POST['salary'] ?? 0);
+
+    if ($action === 'add') {
+        // Default password = Welcome@123
+        $hashed = password_hash('Welcome@123', PASSWORD_DEFAULT);
+
+        $ins_sql = "INSERT INTO Users
+                        (FirstName, LastName, Email, Password, Department, Role,
+                         EmployeeNumber, Salary, IsActive, MustChangePassword, CreatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, GETDATE())";
+
+        $ins_stmt = sqlsrv_query($conn, $ins_sql,
+            array($first_name, $last_name, $email, $hashed, $department, $role, $employee_number, $salary));
+
+        if ($ins_stmt) {
+            $message      = "Employee <strong>$first_name $last_name</strong> added successfully! Default password: <code>Welcome@123</code>";
+            $message_type = 'success';
+            sqlsrv_free_stmt($ins_stmt);
+        } else {
+            $err          = sqlsrv_errors();
+            $message      = 'Error adding employee: ' . ($err[0]['message'] ?? 'Unknown');
+            $message_type = 'error';
         }
-        
-        if ($action === 'deactivate') {
-            $user_id = (int)$_POST['user_id'];
-            $sql = "UPDATE Users SET IsActive = 0 WHERE UserID = ?";
-            $params = array($user_id);
-            
-            if (sqlsrv_query($conn, $sql, $params)) {
-                set_message('Employee deactivated successfully!', 'success');
-            }
-            redirect('manage_employees.php');
-        }
-        
-        if ($action === 'activate') {
-            $user_id = (int)$_POST['user_id'];
-            $sql = "UPDATE Users SET IsActive = 1 WHERE UserID = ?";
-            $params = array($user_id);
-            
-            if (sqlsrv_query($conn, $sql, $params)) {
-                set_message('Employee activated successfully!', 'success');
-            }
-            redirect('manage_employees.php');
+
+    } elseif ($action === 'edit') {
+        $user_id = (int)$_POST['user_id'];
+
+        $upd_sql = "UPDATE Users
+                    SET FirstName = ?, LastName = ?, Email = ?,
+                        Department = ?, Role = ?, EmployeeNumber = ?,
+                        Salary = ?, UpdatedAt = GETDATE()
+                    WHERE UserID = ?";
+
+        $upd_stmt = sqlsrv_query($conn, $upd_sql,
+            array($first_name, $last_name, $email, $department, $role, $employee_number, $salary, $user_id));
+
+        if ($upd_stmt) {
+            $message      = "Employee updated successfully.";
+            $message_type = 'success';
+            sqlsrv_free_stmt($upd_stmt);
+        } else {
+            $err          = sqlsrv_errors();
+            $message      = 'Error updating employee: ' . ($err[0]['message'] ?? 'Unknown');
+            $message_type = 'error';
         }
     }
 }
 
-// Fetch all users
-$users_sql = "SELECT UserID, Email, FirstName, LastName, Department, PhoneNumber, Role, DateJoined, IsActive 
-              FROM Users 
-              ORDER BY Role, FirstName";
+// ── Fetch all users ──────────────────────────────────────────────────────────
+$users_sql  = "SELECT UserID, FirstName, LastName, Email, Department, Role,
+                      EmployeeNumber, Salary, IsActive, CreatedAt
+               FROM Users
+               WHERE IsActive = 1
+               ORDER BY Role, FirstName";
 $users_stmt = sqlsrv_query($conn, $users_sql);
 
-$message = get_message();
+// Edit mode?
+$edit_user = null;
+if (isset($_GET['edit'])) {
+    $edit_id   = (int)$_GET['edit'];
+    $edit_sql  = "SELECT * FROM Users WHERE UserID = ?";
+    $edit_stmt = sqlsrv_query($conn, $edit_sql, array($edit_id));
+    $edit_user = sqlsrv_fetch_array($edit_stmt, SQLSRV_FETCH_ASSOC);
+}
+
+$departments = ['Technical','Finance','HR','Operations','Sales','Marketing','Admin','Legal','Compliance','IT'];
+$roles       = ['employee' => 'Employee', 'hod' => 'Head of Department', 'hr' => 'HR Admin', 'finance' => 'Finance', 'admin' => 'System Admin'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Employees - HR Admin</title>
+    <title>Manage Employees - HR</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }
-        .header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { font-size: 24px; }
-        .btn-logout { padding: 8px 16px; background: rgba(255,255,255,0.2); color: white; text-decoration: none; border-radius: 5px; font-size: 14px; border: 1px solid rgba(255,255,255,0.3); }
-        .nav-menu { background: white; padding: 15px 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; gap: 20px; }
-        .nav-menu a { padding: 8px 16px; text-decoration: none; color: #333; border-radius: 5px; font-weight: 500; }
-        .nav-menu a:hover { background: #f0f0f0; }
-        .nav-menu a.active { background: #4facfe; color: white; }
-        .container { max-width: 1400px; margin: 30px auto; padding: 0 20px; }
-        .alert { padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-        .alert-success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
-        .alert-error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
-        .section { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .section-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-        .section-header h2 { color: #333; font-size: 20px; }
-        .btn-primary { padding: 10px 20px; background: #4facfe; color: white; text-decoration: none; border-radius: 5px; font-size: 14px; display: inline-block; border: none; cursor: pointer; }
-        table { width: 100%; border-collapse: collapse; }
-        table th { text-align: left; padding: 12px; background: #f8f9fa; color: #666; font-weight: 600; font-size: 14px; border-bottom: 2px solid #dee2e6; }
-        table td { padding: 12px; border-bottom: 1px solid #dee2e6; color: #333; font-size: 14px; }
-        table tr:hover { background: #f8f9fa; }
-        .badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
-        .badge-active { background: #d4edda; color: #155724; }
-        .badge-inactive { background: #f8d7da; color: #721c24; }
-        .badge-employee { background: #e7f3ff; color: #004085; }
-        .badge-hod { background: #fff3cd; color: #856404; }
-        .badge-hr { background: #d1ecf1; color: #0c5460; }
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); overflow-y: auto; }
-        .modal-content { background: white; margin: 50px auto; padding: 30px; width: 90%; max-width: 500px; border-radius: 10px; max-height: 85vh; overflow-y: auto; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
-        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
-        .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; margin-right: 5px; color: white; }
-        .btn-deactivate { background: #dc3545; }
-        .btn-activate { background: #28a745; }
-        .btn-close { background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f7fa;}
+        .header{background:linear-gradient(135deg,#4facfe 0%,#00f2fe 100%);color:white;padding:15px 30px;display:flex;justify-content:space-between;align-items:center;}
+        .header h1{font-size:22px;}
+        .btn-logout{padding:8px 16px;background:rgba(255,255,255,.2);color:white;text-decoration:none;border-radius:5px;}
+        .nav-menu{background:white;padding:0 20px;box-shadow:0 2px 4px rgba(0,0,0,.05);display:flex;gap:4px;flex-wrap:wrap;}
+        .nav-menu a{padding:15px 16px;text-decoration:none;color:#333;font-weight:500;font-size:14px;border-bottom:3px solid transparent;}
+        .nav-menu a.active{color:#4facfe;border-bottom-color:#4facfe;}
+        .container{max-width:1300px;margin:28px auto;padding:0 20px;display:grid;grid-template-columns:380px 1fr;gap:24px;align-items:start;}
+        @media(max-width:900px){.container{grid-template-columns:1fr;}}
+
+        .alert{padding:13px 18px;border-radius:8px;font-size:14px;margin-bottom:18px;}
+        .alert-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb;}
+        .alert-error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;}
+
+        /* Form card */
+        .form-card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;position:sticky;top:20px;}
+        .form-card-header{background:linear-gradient(135deg,#4facfe,#00f2fe);color:white;padding:18px 22px;}
+        .form-card-header h2{font-size:17px;font-weight:700;}
+        .form-card-body{padding:22px;}
+        .form-group{margin-bottom:16px;}
+        .form-group label{display:block;font-size:13px;font-weight:600;color:#333;margin-bottom:6px;}
+        .form-group input,
+        .form-group select{width:100%;padding:11px 13px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;transition:.2s;}
+        .form-group input:focus,
+        .form-group select:focus{outline:none;border-color:#4facfe;box-shadow:0 0 0 3px rgba(79,172,254,.12);}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+        .btn-submit{width:100%;padding:13px;background:linear-gradient(135deg,#4facfe,#00f2fe);color:white;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;transition:.2s;}
+        .btn-submit:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(79,172,254,.35);}
+        .btn-cancel{display:block;text-align:center;margin-top:10px;color:#666;text-decoration:none;font-size:13px;}
+
+        /* Table card */
+        .table-card{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden;}
+        .table-header{padding:18px 22px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;}
+        .table-header h2{font-size:17px;color:#333;}
+        table{width:100%;border-collapse:collapse;}
+        thead{background:#f8f9fa;}
+        th{padding:12px 14px;text-align:left;font-size:11px;text-transform:uppercase;color:#666;font-weight:600;}
+        td{padding:13px 14px;border-bottom:1px solid #f0f0f0;font-size:13px;}
+        tr:last-child td{border-bottom:none;}
+        .role-badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;}
+        .role-employee{background:#e3f2fd;color:#1565c0;}
+        .role-hr{background:#e8f5e9;color:#2e7d32;}
+        .role-hod{background:#fce4ec;color:#c62828;}
+        .role-finance{background:#fff8e1;color:#e65100;}
+        .role-admin{background:#f3e5f5;color:#6a1b9a;}
+        .btn-edit{padding:5px 12px;background:#4facfe;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:600;}
+        .btn-del{padding:5px 12px;background:#dc3545;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:600;margin-left:4px;}
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>HR Admin - Manage Employees</h1>
-        <div>
-            <a href="../logout.php" class="btn-logout">Logout</a>
-        </div>
-    </div>
-    
-    <div class="nav-menu">
+
+<div class="header">
+    <h1>&#128084; Manage Employees</h1>
+    <a href="../logout.php" class="btn-logout">Logout</a>
+</div>
+
+<div class="nav-menu">
     <a href="index.php">Dashboard</a>
     <a href="all_requests.php">All Requests</a>
-    <a href="manage_employees.php">Manage Employees</a>
+    <a href="manage_employees.php" class="active">Employees</a>
+    <a href="payment_tracking.php">&#128176; Payments</a>
     <a href="calendar.php">Calendar</a>
     <a href="manage_leave_types.php">Leave Types</a>
     <a href="reports.php">Reports</a>
-    <a href="reports_export.php">Export</a>  
+    <a href="reports_export.php">Export</a>
     <a href="settings.php">Settings</a>
 </div>
-    
-    <div class="container">
-        <?php if ($message): ?>
-            <div class="alert alert-<?php echo $message['type']; ?>">
-                <?php echo $message['message']; ?>
-            </div>
-        <?php endif; ?>
-        
-        <div class="section">
-            <div class="section-header">
-                <h2>All Users</h2>
-                <button class="btn-primary" onclick="document.getElementById('addModal').style.display='block'">+ Add New Employee</button>
-            </div>
-            
-            <table>
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone Number</th>
-                        <th>Department</th>
-                        <th>Role</th>
-                        <th>Date Joined</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($user = sqlsrv_fetch_array($users_stmt, SQLSRV_FETCH_ASSOC)): ?>
-                        <tr>
-                            <td><?php echo htmlspecialchars($user['FirstName'] . ' ' . $user['LastName']); ?></td>
-                            <td><?php echo htmlspecialchars($user['Email']); ?></td>
-                            <td><?php echo htmlspecialchars($user['PhoneNumber'] ?? 'N/A'); ?></td>
-                            <td><?php echo htmlspecialchars($user['Department']); ?></td>
-                            <td>
-                                <span class="badge badge-<?php echo $user['Role']; ?>">
-                                    <?php echo ucfirst($user['Role']); ?>
-                                </span>
-                            </td>
-                            <td><?php echo $user['DateJoined']->format('M d, Y'); ?></td>
-                            <td>
-                                <span class="badge badge-<?php echo $user['IsActive'] ? 'active' : 'inactive'; ?>">
-                                    <?php echo $user['IsActive'] ? 'Active' : 'Inactive'; ?>
-                                </span>
-                            </td>
-                            <td>
-                                <?php if ($user['IsActive']): ?>
-                                    <form method="POST" style="display: inline;">
-                                        <input type="hidden" name="user_id" value="<?php echo $user['UserID']; ?>">
-                                        <button type="submit" name="action" value="deactivate" class="btn-action btn-deactivate" onclick="return confirm('Deactivate this user?')">Deactivate</button>
-                                    </form>
-                                <?php else: ?>
-                                    <form method="POST" style="display: inline;">
-                                        <input type="hidden" name="user_id" value="<?php echo $user['UserID']; ?>">
-                                        <button type="submit" name="action" value="activate" class="btn-action btn-activate">Activate</button>
-                                    </form>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
+
+<div style="max-width:1300px;margin:28px auto;padding:0 20px;">
+    <?php if ($message): ?>
+    <div class="alert alert-<?php echo $message_type; ?>"><?php echo $message; ?></div>
+    <?php endif; ?>
+</div>
+
+<div class="container">
+
+    <!-- ── Add / Edit Form ── -->
+    <div class="form-card">
+        <div class="form-card-header">
+            <h2><?php echo $edit_user ? '&#9998; Edit Employee' : '&#43; Add New Employee'; ?></h2>
         </div>
-    </div>
-    
-    <!-- Add Employee Modal -->
-    <div id="addModal" class="modal">
-        <div class="modal-content">
-            <h2 style="margin-bottom: 20px;">Add New Employee</h2>
-            <form method="POST">
-                <input type="hidden" name="action" value="add">
-                <div class="form-group">
-                    <label>First Name *</label>
-                    <input type="text" name="first_name" required>
+        <div class="form-card-body">
+            <form method="POST" action="">
+                <input type="hidden" name="action" value="<?php echo $edit_user ? 'edit' : 'add'; ?>">
+                <?php if ($edit_user): ?>
+                <input type="hidden" name="user_id" value="<?php echo $edit_user['UserID']; ?>">
+                <?php endif; ?>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name *</label>
+                        <input type="text" name="first_name" required
+                            value="<?php echo htmlspecialchars($edit_user['FirstName'] ?? ''); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name *</label>
+                        <input type="text" name="last_name" required
+                            value="<?php echo htmlspecialchars($edit_user['LastName'] ?? ''); ?>">
+                    </div>
                 </div>
+
                 <div class="form-group">
-                    <label>Last Name *</label>
-                    <input type="text" name="last_name" required>
+                    <label>Email Address *</label>
+                    <input type="email" name="email" required
+                        value="<?php echo htmlspecialchars($edit_user['Email'] ?? ''); ?>">
                 </div>
+
                 <div class="form-group">
-                    <label>Email *</label>
-                    <input type="email" name="email" required>
+                    <label>Employee Number *</label>
+                    <input type="text" name="employee_number" required
+                        value="<?php echo htmlspecialchars($edit_user['EmployeeNumber'] ?? ''); ?>">
                 </div>
-                <div class="form-group">
-                    <label>Phone Number</label>
-                    <input type="tel" name="phone_number" placeholder="e.g., +234 800 000 0000">
-                </div>
+
                 <div class="form-group">
                     <label>Department *</label>
-                    <input type="text" name="department" required>
+                    <select name="department" required>
+                        <option value="">-- Select --</option>
+                        <?php foreach ($departments as $dept): ?>
+                        <option value="<?php echo $dept; ?>"
+                            <?php echo (($edit_user['Department'] ?? '') === $dept) ? 'selected' : ''; ?>>
+                            <?php echo $dept; ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
-                <div class="form-group">
-    <label for="salary">Monthly Salary *</label>
-    <input type="number" id="salary" name="salary" step="0.01" min="0" required>
-                </div>
-                <div class="form-group">
-    <label for="annual_leave_allowance">💰 Annual Leave Allowance *</label>
-    <input 
-        type="number" 
-        id="annual_leave_allowance" 
-        name="annual_leave_allowance" 
-        step="0.01" 
-        min="0" 
-        placeholder="e.g., 70000.00"
-        required
-    >
-    <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">
-        Total amount employee receives for annual leave per year
-    </small>
-</div>
+
                 <div class="form-group">
                     <label>Role *</label>
                     <select name="role" required>
-                        <option value="employee">Employee</option>
-                        <option value="hod">HOD (Head of Department)</option>
+                        <?php foreach ($roles as $val => $label): ?>
+                        <option value="<?php echo $val; ?>"
+                            <?php echo (($edit_user['Role'] ?? 'employee') === $val) ? 'selected' : ''; ?>>
+                            <?php echo $label; ?>
+                        </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <button type="submit" class="btn-primary">Add Employee</button>
-                    <button type="button" class="btn-close" onclick="document.getElementById('addModal').style.display='none'">Cancel</button>
+
+                <div class="form-group">
+                    <label>Monthly Salary (&#8358;) *</label>
+                    <input type="number" name="salary" min="0" step="0.01" required
+                        placeholder="e.g. 150000"
+                        value="<?php echo htmlspecialchars($edit_user['Salary'] ?? ''); ?>">
                 </div>
+
+                <?php if (!$edit_user): ?>
+                <p style="font-size:12px;color:#888;margin-bottom:14px;background:#f8f9fa;padding:10px;border-radius:6px;">
+                    &#128274; Default password: <strong>Welcome@123</strong><br>
+                    Employee will be prompted to change it on first login.
+                </p>
+                <?php endif; ?>
+
+                <button type="submit" class="btn-submit">
+                    <?php echo $edit_user ? '&#9998; Update Employee' : '&#43; Add Employee'; ?>
+                </button>
+
+                <?php if ($edit_user): ?>
+                <a href="manage_employees.php" class="btn-cancel">&#8592; Cancel Edit</a>
+                <?php endif; ?>
             </form>
         </div>
     </div>
-    <script>
-// Auto-calculate annual leave allowance based on salary
-document.getElementById('salary').addEventListener('input', function() {
-    const salary = parseFloat(this.value) || 0;
-    const dailyRate = salary / 30;
-    const annualLeaveAllowance = dailyRate * 21; // Assuming 21 days annual leave
-    
-    document.getElementById('annual_leave_allowance').value = annualLeaveAllowance.toFixed(2);
-});
-</script>
+
+    <!-- ── Employee Table ── -->
+    <div class="table-card">
+        <div class="table-header">
+            <h2>&#128100; All Active Users</h2>
+            <span style="font-size:13px;color:#888;">
+                <?php
+                // count rows
+                $cnt_stmt = sqlsrv_query($conn, "SELECT COUNT(*) as c FROM Users WHERE IsActive=1");
+                $cnt_row  = sqlsrv_fetch_array($cnt_stmt, SQLSRV_FETCH_ASSOC);
+                echo ($cnt_row['c'] ?? 0) . ' users';
+                ?>
+            </span>
+        </div>
+
+        <?php if ($users_stmt && sqlsrv_has_rows($users_stmt)): ?>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Emp No.</th>
+                    <th>Dept</th>
+                    <th>Role</th>
+                    <th>Salary</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php while ($u = sqlsrv_fetch_array($users_stmt, SQLSRV_FETCH_ASSOC)): ?>
+            <tr>
+                <td><strong><?php echo htmlspecialchars($u['FirstName'] . ' ' . $u['LastName']); ?></strong></td>
+                <td style="font-size:12px;"><?php echo htmlspecialchars($u['Email']); ?></td>
+                <td style="font-family:monospace;"><?php echo htmlspecialchars($u['EmployeeNumber'] ?? '—'); ?></td>
+                <td><?php echo htmlspecialchars($u['Department']); ?></td>
+                <td>
+                    <span class="role-badge role-<?php echo $u['Role']; ?>">
+                        <?php echo $roles[$u['Role']] ?? ucfirst($u['Role']); ?>
+                    </span>
+                </td>
+                <td>&#8358;<?php echo number_format($u['Salary'] ?? 0, 2); ?></td>
+                <td>
+                    <a href="?edit=<?php echo $u['UserID']; ?>" class="btn-edit">Edit</a>
+                    <?php if ($u['Role'] === 'employee'): ?>
+                    <a href="?delete=<?php echo $u['UserID']; ?>" class="btn-del"
+                       onclick="return confirm('Deactivate this employee?')">Remove</a>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <?php endwhile; ?>
+            </tbody>
+        </table>
+        <?php else: ?>
+        <p style="text-align:center;padding:40px;color:#999;">No active employees found.</p>
+        <?php endif; ?>
+    </div>
+
+</div>
 </body>
 </html>
 <?php
