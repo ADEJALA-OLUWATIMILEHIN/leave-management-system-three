@@ -202,7 +202,7 @@ $message = get_message();
 </head>
 <body>
     <div class="header">
-        <h1>💰 Finance Dashboard</h1>
+        <h1> Finance Dashboard</h1>
         <div class="user-info">
             <span>Welcome, <?php echo htmlspecialchars($user_name); ?></span>
             <a href="../logout.php" class="btn-logout">Logout</a>

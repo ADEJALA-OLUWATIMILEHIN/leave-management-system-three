@@ -1,96 +1,62 @@
 <?php
-require_once __DIR__ . '/../config/database.php';
-
-if (!is_logged_in()) {
-    redirect('../login.php');
-}
 /**
- * Employee Dashboard
- * Leave Management System with Payment Tracking
+ * Employee Portal - Entry Guard
+ * Fixes incorrect redirect to XAMPP default page
  */
 
+// Must be the FIRST thing - before any output
 require_once __DIR__ . '/../config/database.php';
 
-// Force password change if required
-if (isset($_SESSION['must_change_password']) && $_SESSION['must_change_password'] === true) {
-    redirect('../change_password.php');
-}
-
-// Check if user is logged in
+// Not logged in → go to employee login
 if (!is_logged_in()) {
-    redirect('../login.php');
+    redirect('login.php');
 }
 
-// Check if user is admin and redirect
-if (function_exists('is_admin') && is_admin()) {
-    redirect('../admin/index.php');
-}
+// Wrong role → redirect to correct portal
+$role = $_SESSION['role'] ?? '';
+if ($role === 'hr')      { redirect('../hr/index.php');      }
+if ($role === 'hod')     { redirect('../hod/index.php');     }
+if ($role === 'finance') { redirect('../finance/index.php'); }
+if ($role !== 'employee') { redirect('login.php');           }
 
-$user_id = $_SESSION['user_id'];
+// ── Employee is valid — load dashboard ──────────────────────────────────────
+$user_id   = $_SESSION['user_id'];
 $user_name = $_SESSION['name'];
 
-// Get current year
-$current_year = date('Y');
-
-// Fetch leave balances
-$balance_sql = "SELECT lt.TypeName, lb.TotalDays, lb.UsedDays, lb.RemainingDays
+// Get employee's leave balance
+$balance_sql = "SELECT
+                    lt.TypeName,
+                    lb.TotalEntitlement,
+                    lb.DaysUsed,
+                    lb.DaysRemaining
                 FROM LeaveBalances lb
                 JOIN LeaveTypes lt ON lb.LeaveTypeID = lt.LeaveTypeID
-                WHERE lb.UserID = ? AND lb.Year = ?
-                ORDER BY lt.TypeName";
-$balance_params = array($user_id, $current_year);
-$balance_stmt = sqlsrv_query($conn, $balance_sql, $balance_params);
+                WHERE lb.UserID = ? AND lb.Year = YEAR(GETDATE())";
+$balance_stmt = sqlsrv_query($conn, $balance_sql, array($user_id));
 
-// Get leave statistics
-$stats_sql = "SELECT 
-                COUNT(*) as TotalRequests,
-                SUM(CASE WHEN HODApprovalStatus = 'pending' THEN 1 ELSE 0 END) as PendingHOD,
-                SUM(CASE WHEN HODApprovalStatus = 'approved' AND HRApprovalStatus = 'pending' THEN 1 ELSE 0 END) as PendingHR,
-                SUM(CASE WHEN HRApprovalStatus = 'approved' THEN 1 ELSE 0 END) as Approved,
-                SUM(CASE WHEN HODApprovalStatus = 'rejected' OR HRApprovalStatus = 'rejected' THEN 1 ELSE 0 END) as Rejected
-              FROM LeaveRequests
-              WHERE UserID = ?";
-$stats_stmt = sqlsrv_query($conn, $stats_sql, array($user_id));
-$stats = sqlsrv_fetch_array($stats_stmt, SQLSRV_FETCH_ASSOC);
-
-// Get recent leave requests with payment info
-$requests_sql = "SELECT 
+// Get employee's recent leave requests
+$requests_sql = "SELECT TOP 10
                     lr.RequestID,
+                    lt.TypeName,
                     lr.StartDate,
                     lr.EndDate,
                     lr.TotalDays,
-                    lr.Status,
                     lr.HODApprovalStatus,
                     lr.HRApprovalStatus,
-                    lr.CreatedAt as SubmittedAt,
-                    lt.TypeName as LeaveType,
-                    lp.PaymentID,
-                    lp.Amount,
-                    lp.Status as PaymentStatus,
-                    lp.RequestedByEmployee,
-                    lp.PaymentSplitChoice,
-                    lp.FirstPaymentAmount,
-                    lp.SecondPaymentAmount,
-                    lp.FirstPaymentStatus,
-                    lp.SecondPaymentStatus,
-                    lp.PaymentReference
-                 FROM LeaveRequests lr
-                 JOIN LeaveTypes lt ON lr.LeaveTypeID = lt.LeaveTypeID
-                 LEFT JOIN LeavePayments lp ON lr.RequestID = lp.RequestID
-                 WHERE lr.UserID = ?
-                 ORDER BY lr.CreatedAt DESC";
+                    lr.Status,
+                    lr.CreatedAt
+                FROM LeaveRequests lr
+                JOIN LeaveTypes lt ON lr.LeaveTypeID = lt.LeaveTypeID
+                WHERE lr.UserID = ?
+                ORDER BY lr.CreatedAt DESC";
 $requests_stmt = sqlsrv_query($conn, $requests_sql, array($user_id));
 
-// Get payment statistics
-$payment_stats_sql = "SELECT 
-                        COUNT(*) as TotalPayments,
-                        SUM(CASE WHEN Status = 'Pending' THEN Amount ELSE 0 END) as PendingAmount,
-                        SUM(CASE WHEN Status = 'Paid' THEN Amount ELSE 0 END) as PaidAmount,
-                        SUM(Amount) as TotalAmount
-                      FROM LeavePayments
-                      WHERE EmployeeID = ?";
-$payment_stats_stmt = sqlsrv_query($conn, $payment_stats_sql, array($user_id));
-$payment_stats = sqlsrv_fetch_array($payment_stats_stmt, SQLSRV_FETCH_ASSOC);
+// Get pending payments for employee
+$payment_sql  = "SELECT lp.PaymentID, lp.Amount, lp.Status, lp.CreatedAt
+                 FROM LeavePayments lp
+                 WHERE lp.EmployeeID = ?
+                 ORDER BY lp.CreatedAt DESC";
+$payment_stmt = sqlsrv_query($conn, $payment_sql, array($user_id));
 
 $message = get_message();
 ?>
@@ -99,388 +65,147 @@ $message = get_message();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Employee Dashboard</title>
+    <title>Employee Dashboard - Leave Management</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header h1 { font-size: 28px; }
-        .user-info { display: flex; align-items: center; gap: 20px; }
-        .btn-logout {
-            padding: 10px 20px;
-            background: rgba(255,255,255,0.2);
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-weight: 600;
-        }
-        
-        .nav-menu {
-            background: white;
-            padding: 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            display: flex;
-        }
-        .nav-menu a {
-            padding: 18px 25px;
-            text-decoration: none;
-            color: #333;
-            font-weight: 500;
-            border-bottom: 3px solid transparent;
-            transition: 0.3s;
-        }
-        .nav-menu a:hover { background: #f8f9fa; }
-        .nav-menu a.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-            background: #f8f9fa;
-        }
-        
-        .container { max-width: 1400px; margin: 30px auto; padding: 0 20px; }
-        
-        .alert {
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-weight: 500;
-        }
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        .stat-card h3 {
-            color: #666;
-            font-size: 13px;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-        }
-        .stat-card .number {
-            font-size: 36px;
-            font-weight: 700;
-            color: #333;
-        }
-        .stat-card .sub-number {
-            font-size: 18px;
-            font-weight: 600;
-            color: #666;
-            margin-top: 5px;
-        }
-        .stat-card.primary { border-left: 4px solid #667eea; }
-        .stat-card.primary .number { color: #667eea; }
-        .stat-card.success { border-left: 4px solid #28a745; }
-        .stat-card.success .number { color: #28a745; }
-        .stat-card.warning { border-left: 4px solid #ffc107; }
-        .stat-card.warning .number { color: #ffc107; }
-        .stat-card.danger { border-left: 4px solid #dc3545; }
-        .stat-card.danger .number { color: #dc3545; }
-        
-        /* Section */
-        .section {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            margin-bottom: 25px;
-        }
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #f0f0f0;
-        }
-        .section-header h2 {
-            font-size: 20px;
-            color: #333;
-        }
-        .btn-primary {
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-        
-        /* Table */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        thead {
-            background: #f8f9fa;
-        }
-        th {
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-            color: #333;
-            font-size: 13px;
-            text-transform: uppercase;
-        }
-        td {
-            padding: 18px 15px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        
-        .status-badge {
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            display: inline-block;
-        }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-approved { background: #d4edda; color: #155724; }
-        .status-rejected { background: #f8d7da; color: #721c24; }
-        .status-paid { background: #d4edda; color: #155724; }
-        
-        .payment-info {
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 6px;
-            margin-top: 8px;
-            font-size: 13px;
-        }
-        .payment-info strong {
-            color: #28a745;
-        }
-        
-        .btn-request-payment {
-            padding: 8px 16px;
-            background: #28a745;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            display: inline-block;
-        }
-        .btn-request-payment:hover {
-            background: #218838;
-        }
-        
-        .no-data {
-            text-align: center;
-            padding: 40px;
-            color: #999;
-        }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f7fa;}
+        .header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:16px 30px;display:flex;justify-content:space-between;align-items:center;}
+        .header h1{font-size:22px;}
+        .header-right{display:flex;align-items:center;gap:18px;}
+        .btn-logout{padding:8px 18px;background:rgba(255,255,255,.2);color:white;text-decoration:none;border-radius:6px;font-size:14px;border:1px solid rgba(255,255,255,.3);}
+        .nav-menu{background:white;padding:0 24px;box-shadow:0 2px 4px rgba(0,0,0,.05);display:flex;gap:4px;flex-wrap:wrap;}
+        .nav-menu a{padding:15px 16px;text-decoration:none;color:#333;font-weight:500;font-size:14px;border-bottom:3px solid transparent;}
+        .nav-menu a.active{color:#667eea;border-bottom-color:#667eea;}
+        .container{max-width:1200px;margin:28px auto;padding:0 20px;}
+        .alert{padding:13px 18px;border-radius:8px;font-size:14px;margin-bottom:20px;}
+        .alert-success{background:#d4edda;color:#155724;}
+        .alert-error  {background:#f8d7da;color:#721c24;}
+        .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-bottom:28px;}
+        .stat-card{background:white;padding:22px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+        .stat-card h3{color:#888;font-size:12px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;}
+        .stat-card .num{font-size:32px;font-weight:700;color:#667eea;}
+        .stat-card .sub{font-size:12px;color:#aaa;margin-top:4px;}
+        .section{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.07);margin-bottom:22px;overflow:hidden;}
+        .section-header{padding:18px 22px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;}
+        .section-header h2{font-size:17px;color:#333;}
+        .btn-primary{padding:9px 20px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;text-decoration:none;border-radius:7px;font-size:13px;font-weight:600;}
+        table{width:100%;border-collapse:collapse;}
+        th{padding:12px 16px;text-align:left;font-size:11px;text-transform:uppercase;color:#666;font-weight:600;background:#f8f9fa;}
+        td{padding:13px 16px;border-bottom:1px solid #f5f5f5;font-size:13px;}
+        tr:last-child td{border-bottom:none;}
+        .badge{padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700;}
+        .badge-pending {background:#fff3cd;color:#856404;}
+        .badge-approved{background:#d4edda;color:#155724;}
+        .badge-rejected{background:#f8d7da;color:#721c24;}
+        .badge-paid    {background:#d4edda;color:#155724;}
+        .empty{text-align:center;padding:40px;color:#999;font-size:14px;}
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Employee Dashboard</h1>
-        <div class="user-info">
-            <span>Welcome, <?php echo htmlspecialchars($user_name); ?></span>
-            <a href="../logout.php" class="btn-logout">Logout</a>
+
+<div class="header">
+    <h1>&#128100; Employee Dashboard</h1>
+    <div class="header-right">
+        <span>Welcome, <strong><?php echo htmlspecialchars($user_name); ?></strong></span>
+        <a href="../logout.php" class="btn-logout">Logout</a>
+    </div>
+</div>
+
+<div class="nav-menu">
+    <a href="index.php" class="active">Dashboard</a>
+    <a href="apply_leave.php">Apply for Leave</a>
+    <a href="my_requests.php">My Requests</a>
+    <a href="my_payments.php">My Payments</a>
+</div>
+
+<div class="container">
+
+    <?php if ($message): ?>
+    <div class="alert alert-<?php echo $message['type']; ?>"><?php echo $message['message']; ?></div>
+    <?php endif; ?>
+
+    <!-- Leave Balance Cards -->
+    <?php if ($balance_stmt && sqlsrv_has_rows($balance_stmt)): ?>
+    <div class="stats-grid">
+        <?php while ($bal = sqlsrv_fetch_array($balance_stmt, SQLSRV_FETCH_ASSOC)): ?>
+        <div class="stat-card">
+            <h3><?php echo htmlspecialchars($bal['TypeName']); ?></h3>
+            <div class="num"><?php echo $bal['DaysRemaining'] ?? 0; ?></div>
+            <div class="sub">days remaining of <?php echo $bal['TotalEntitlement'] ?? 0; ?></div>
         </div>
+        <?php endwhile; ?>
     </div>
-    
-    <div class="nav-menu">
-        <a href="index.php" class="active">Dashboard</a>
-        <a href="submit_leave.php">Apply for Leave</a>
-        <a href="leave_history.php">Leave History</a>
-    </div>
-    
-    <div class="container">
-        <?php if ($message): ?>
-            <div class="alert alert-<?php echo $message['type'] === 'success' ? 'success' : 'error'; ?>">
-                <?php echo $message['message']; ?>
-            </div>
+    <?php endif; ?>
+
+    <!-- Recent Requests -->
+    <div class="section">
+        <div class="section-header">
+            <h2>&#128197; My Leave Requests</h2>
+            <a href="apply_leave.php" class="btn-primary">+ Apply for Leave</a>
+        </div>
+        <?php if ($requests_stmt && sqlsrv_has_rows($requests_stmt)): ?>
+        <table>
+            <thead>
+                <tr>
+                    <th>Leave Type</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Days</th>
+                    <th>HOD Status</th>
+                    <th>HR Status</th>
+                    <th>Submitted</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php while ($req = sqlsrv_fetch_array($requests_stmt, SQLSRV_FETCH_ASSOC)): ?>
+            <tr>
+                <td><?php echo htmlspecialchars($req['TypeName']); ?></td>
+                <td><?php echo ($req['StartDate'] instanceof DateTime) ? $req['StartDate']->format('M d, Y') : 'N/A'; ?></td>
+                <td><?php echo ($req['EndDate']   instanceof DateTime) ? $req['EndDate']->format('M d, Y')   : 'N/A'; ?></td>
+                <td><?php echo $req['TotalDays']; ?>d</td>
+                <td><span class="badge badge-<?php echo $req['HODApprovalStatus']; ?>"><?php echo ucfirst($req['HODApprovalStatus']); ?></span></td>
+                <td><span class="badge badge-<?php echo $req['HRApprovalStatus']; ?>"><?php echo ucfirst($req['HRApprovalStatus']); ?></span></td>
+                <td><?php echo ($req['CreatedAt'] instanceof DateTime) ? $req['CreatedAt']->format('M d, Y') : 'N/A'; ?></td>
+            </tr>
+            <?php endwhile; ?>
+            </tbody>
+        </table>
+        <?php else: ?>
+        <div class="empty">No leave requests yet. <a href="apply_leave.php">Apply for leave</a>.</div>
         <?php endif; ?>
-        
-        <!-- Statistics -->
-        <div class="stats-grid">
-            <div class="stat-card primary">
-                <h3>Total Requests</h3>
-                <div class="number"><?php echo $stats['TotalRequests'] ?? 0; ?></div>
-            </div>
-            <div class="stat-card warning">
-                <h3>Pending HOD</h3>
-                <div class="number"><?php echo $stats['PendingHOD'] ?? 0; ?></div>
-            </div>
-            <div class="stat-card warning">
-                <h3>Pending HR</h3>
-                <div class="number"><?php echo $stats['PendingHR'] ?? 0; ?></div>
-            </div>
-            <div class="stat-card success">
-                <h3>Approved</h3>
-                <div class="number"><?php echo $stats['Approved'] ?? 0; ?></div>
-            </div>
-            <div class="stat-card danger">
-                <h3>Rejected</h3>
-                <div class="number"><?php echo $stats['Rejected'] ?? 0; ?></div>
-            </div>
-            <div class="stat-card success">
-                <h3>Total Allowance</h3>
-                <div class="number" style="font-size: 24px;">₦<?php echo number_format($payment_stats['TotalAmount'] ?? 0, 2); ?></div>
-            </div>
-        </div>
-        
-        <!-- Leave Balance -->
-        <div class="section">
-            <div class="section-header">
-                <h2>Leave Balance (<?php echo $current_year; ?>)</h2>
-            </div>
-            
-            <?php if ($balance_stmt && sqlsrv_has_rows($balance_stmt)): ?>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Leave Type</th>
-                            <th>Total Days</th>
-                            <th>Used Days</th>
-                            <th>Remaining Days</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php while ($balance = sqlsrv_fetch_array($balance_stmt, SQLSRV_FETCH_ASSOC)): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($balance['TypeName']); ?></td>
-                                <td><?php echo $balance['TotalDays']; ?></td>
-                                <td><?php echo $balance['UsedDays']; ?></td>
-                                <td><strong><?php echo $balance['RemainingDays']; ?></strong></td>
-                            </tr>
-                        <?php endwhile; ?>
-                    </tbody>
-                </table>
-            <?php else: ?>
-                <div class="no-data">No leave balance data available.</div>
-            <?php endif; ?>
-        </div>
-        
-        <!-- Leave Requests & Payments -->
-        <div class="section">
-            <div class="section-header">
-                <h2>My Leave Requests & Payments</h2>
-                <a href="submit_leave.php" class="btn-primary">+ Apply for Leave</a>
-            </div>
-            
-            <?php if ($requests_stmt && sqlsrv_has_rows($requests_stmt)): ?>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Leave Type</th>
-                        <th>Period</th>
-                        <th>Days</th>
-                        <th>HOD Status</th>
-                        <th>HR Status</th>
-                        <th>Payment Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($req = sqlsrv_fetch_array($requests_stmt, SQLSRV_FETCH_ASSOC)): 
-                        $hodStatus = $req['HODApprovalStatus'] ?? 'pending';
-                        $hrStatus = $req['HRApprovalStatus'] ?? 'pending';
-                    ?>
-                    <tr>
-                        <td><strong><?php echo htmlspecialchars($req['LeaveType']); ?></strong></td>
-                        <td>
-                            <?php echo $req['StartDate']->format('M d, Y'); ?> - 
-                            <?php echo $req['EndDate']->format('M d, Y'); ?>
-                        </td>
-                        <td><?php echo $req['TotalDays']; ?> days</td>
-                        <td>
-                            <span class="status-badge status-<?php echo $hodStatus; ?>">
-                                <?php echo ucfirst($hodStatus); ?>
-                            </span>
-                        </td>
-                        <td>
-                            <?php if ($hodStatus === 'approved'): ?>
-                                <span class="status-badge status-<?php echo $hrStatus; ?>">
-                                    <?php echo ucfirst($hrStatus); ?>
-                                </span>
-                            <?php else: ?>
-                                <span style="color: #999;">N/A</span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if ($req['PaymentID']): ?>
-                                <span class="status-badge status-<?php echo strtolower($req['PaymentStatus']); ?>">
-                                    <?php echo $req['PaymentStatus']; ?>
-                                </span>
-                                
-                                <div class="payment-info">
-                                    <strong>Amount: ₦<?php echo number_format($req['Amount'], 2); ?></strong>
-                                    
-                                    <?php if ($req['PaymentSplitChoice'] === 'split'): ?>
-                                        <br>Split: ₦<?php echo number_format($req['FirstPaymentAmount'], 2); ?> + 
-                                        ₦<?php echo number_format($req['SecondPaymentAmount'], 2); ?>
-                                        <br>
-                                        <small>
-                                            First: <?php echo $req['FirstPaymentStatus']; ?> | 
-                                            Second: <?php echo $req['SecondPaymentStatus']; ?>
-                                        </small>
-                                    <?php endif; ?>
-                                    
-                                    <?php if ($req['PaymentReference']): ?>
-                                        <br><small>Ref: <?php echo $req['PaymentReference']; ?></small>
-                                    <?php endif; ?>
-                                </div>
-                            <?php else: ?>
-                                <span style="color: #999;">-</span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <?php if ($hrStatus === 'approved' && $req['PaymentID'] && !$req['RequestedByEmployee']): ?>
-                                <a href="request_payment.php?id=<?php echo $req['PaymentID']; ?>" 
-                                   class="btn-request-payment">
-                                     Request Payment
-                                </a>
-                            <?php elseif ($hrStatus === 'approved' && $req['PaymentID'] && $req['RequestedByEmployee']): ?>
-                                <span style="color: #28a745; font-weight: 600;">✓ Requested</span>
-                            <?php else: ?>
-                                <span style="color: #999;">-</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
-            <?php else: ?>
-                <div class="no-data">
-                    <p>No leave requests yet.</p>
-                    <a href="submit_leave.php" class="btn-primary" style="margin-top: 15px;">Submit Your First Request</a>
-                </div>
-            <?php endif; ?>
-        </div>
     </div>
+
+    <!-- Payments -->
+    <div class="section">
+        <div class="section-header">
+            <h2> My Payments</h2>
+        </div>
+        <?php if ($payment_stmt && sqlsrv_has_rows($payment_stmt)): ?>
+        <table>
+            <thead>
+                <tr><th>#</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+            </thead>
+            <tbody>
+            <?php while ($pay = sqlsrv_fetch_array($payment_stmt, SQLSRV_FETCH_ASSOC)): ?>
+            <tr>
+                <td>#<?php echo $pay['PaymentID']; ?></td>
+                <td><strong style="color:#28a745;">&#8358;<?php echo number_format($pay['Amount'], 2); ?></strong></td>
+                <td><span class="badge badge-<?php echo strtolower($pay['Status']); ?>"><?php echo $pay['Status']; ?></span></td>
+                <td><?php echo ($pay['CreatedAt'] instanceof DateTime) ? $pay['CreatedAt']->format('M d, Y') : 'N/A'; ?></td>
+            </tr>
+            <?php endwhile; ?>
+            </tbody>
+        </table>
+        <?php else: ?>
+        <div class="empty">No payment records yet.</div>
+        <?php endif; ?>
+    </div>
+
+</div>
 </body>
 </html>
 <?php
-if ($balance_stmt) sqlsrv_free_stmt($balance_stmt);
+if ($balance_stmt)  sqlsrv_free_stmt($balance_stmt);
 if ($requests_stmt) sqlsrv_free_stmt($requests_stmt);
-if ($stats_stmt) sqlsrv_free_stmt($stats_stmt);
-if ($payment_stats_stmt) sqlsrv_free_stmt($payment_stats_stmt);
+if ($payment_stmt)  sqlsrv_free_stmt($payment_stmt);
 ?>

@@ -1,33 +1,31 @@
 <?php
 /**
- * Logout Script
- * Leave Management System
+ * Logout - Leave Management System
+ * Destroys session and redirects to main portal landing page
  */
 
-session_start();
-
-// Log the logout activity if user is logged in
-if (isset($_SESSION['user_id'])) {
-    require_once __DIR__ . '/config/database.php';
-    
-    $log_sql = "INSERT INTO ActivityLog (UserID, Action, Description, IPAddress) 
-                VALUES (?, 'Logout', 'User logged out', ?)";
-    $log_params = array($_SESSION['user_id'], $_SERVER['REMOTE_ADDR']);
-    sqlsrv_query($conn, $log_sql, $log_params);
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-// Destroy all session data
+// Clear all session data
 $_SESSION = array();
 
-// Delete the session cookie
-if (isset($_COOKIE[session_name()])) {
-    setcookie(session_name(), '', time()-3600, '/');
+// Destroy the session cookie
+if (ini_get("session.use_cookies")) {
+    $params = session_get_cookie_params();
+    setcookie(
+        session_name(), '', time() - 42000,
+        $params["path"], $params["domain"],
+        $params["secure"], $params["httponly"]
+    );
 }
 
 // Destroy the session
 session_destroy();
 
-// Redirect to login page
-header("Location: login.php");
+// Redirect to the MAIN PORTAL landing page (not login)
+header("Location: /leave-management/index.php");
 exit();
 ?>

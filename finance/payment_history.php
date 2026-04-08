@@ -93,7 +93,7 @@ $months = ['','January','February','March','April','May','June','July','August',
 <body>
 
 <div class="header">
-    <h1>&#128203; Payment History</h1>
+    <h1> Payment History</h1>
     <a href="../logout.php" class="btn-logout">Logout</a>
 </div>
 

@@ -122,7 +122,7 @@ $stats = sqlsrv_fetch_array($stats_stmt, SQLSRV_FETCH_ASSOC);
 </head>
 <body>
     <div class="header">
-        <h1>&#128176; Leave Payment Tracking</h1>
+        <h1> Leave Payment Tracking</h1>
         <a href="../logout.php" class="btn-logout">Logout</a>
     </div>
     
@@ -130,7 +130,7 @@ $stats = sqlsrv_fetch_array($stats_stmt, SQLSRV_FETCH_ASSOC);
         <a href="index.php">Dashboard</a>
         <a href="all_requests.php">All Requests</a>
         <a href="manage_employees.php">Employees</a>
-        <a href="payment_tracking.php" class="active">&#128176; Payments</a>
+        <a href="payment_tracking.php" class="active"> Payments</a>
         <a href="calendar.php">Calendar</a>
         <a href="reports_export.php">Export</a>
     </div>

@@ -36,8 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $salary          = (float)($_POST['salary'] ?? 0);
 
     if ($action === 'add') {
-        // Default password = Welcome@123
-        $hashed = password_hash('Welcome@123', PASSWORD_DEFAULT);
+        // Default password = Sterling123?
+        $hashed = password_hash('Sterling123?', PASSWORD_DEFAULT);
 
         $ins_sql = "INSERT INTO Users
                         (FirstName, LastName, Email, Password, Department, Role,
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             array($first_name, $last_name, $email, $hashed, $department, $role, $employee_number, $salary));
 
         if ($ins_stmt) {
-            $message      = "Employee <strong>$first_name $last_name</strong> added successfully! Default password: <code>Welcome@123</code>";
+            $message      = "Employee <strong>$first_name $last_name</strong> added successfully! Default password: <code>Sterling123?</code>";
             $message_type = 'success';
             sqlsrv_free_stmt($ins_stmt);
         } else {
@@ -154,8 +154,9 @@ $roles       = ['employee' => 'Employee', 'hod' => 'Head of Department', 'hr' =>
         .role-hod{background:#fce4ec;color:#c62828;}
         .role-finance{background:#fff8e1;color:#e65100;}
         .role-admin{background:#f3e5f5;color:#6a1b9a;}
-        .btn-edit{padding:5px 12px;background:#4facfe;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:600;}
-        .btn-del{padding:5px 12px;background:#dc3545;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:600;margin-left:4px;}
+        .actions-cell{display:flex;flex-direction:column;gap:5px;align-items:flex-start;}
+        .btn-edit{padding:5px 14px;background:#4facfe;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-block;}
+        .btn-del{padding:5px 14px;background:#dc3545;color:white;text-decoration:none;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap;display:inline-block;}
     </style>
 </head>
 <body>
@@ -248,15 +249,15 @@ $roles       = ['employee' => 'Employee', 'hod' => 'Head of Department', 'hr' =>
                 </div>
 
                 <div class="form-group">
-                    <label>Monthly Salary (&#8358;) *</label>
+                    <label>Annual Leave Allowance (&#8358;) *</label>
                     <input type="number" name="salary" min="0" step="0.01" required
-                        placeholder="e.g. 150000"
+                        placeholder="e.g. 300000 (total annual leave allowance)"
                         value="<?php echo htmlspecialchars($edit_user['Salary'] ?? ''); ?>">
                 </div>
 
                 <?php if (!$edit_user): ?>
                 <p style="font-size:12px;color:#888;margin-bottom:14px;background:#f8f9fa;padding:10px;border-radius:6px;">
-                    &#128274; Default password: <strong>Welcome@123</strong><br>
+                    &#128274; Default password: <strong>Sterling123?</strong><br>
                     Employee will be prompted to change it on first login.
                 </p>
                 <?php endif; ?>
@@ -295,7 +296,7 @@ $roles       = ['employee' => 'Employee', 'hod' => 'Head of Department', 'hr' =>
                     <th>Emp No.</th>
                     <th>Dept</th>
                     <th>Role</th>
-                    <th>Salary</th>
+                    <th>Leave Allowance</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -313,11 +314,13 @@ $roles       = ['employee' => 'Employee', 'hod' => 'Head of Department', 'hr' =>
                 </td>
                 <td>&#8358;<?php echo number_format($u['Salary'] ?? 0, 2); ?></td>
                 <td>
-                    <a href="?edit=<?php echo $u['UserID']; ?>" class="btn-edit">Edit</a>
-                    <?php if ($u['Role'] === 'employee'): ?>
-                    <a href="?delete=<?php echo $u['UserID']; ?>" class="btn-del"
-                       onclick="return confirm('Deactivate this employee?')">Remove</a>
-                    <?php endif; ?>
+                    <div class="actions-cell">
+                        <a href="?edit=<?php echo $u['UserID']; ?>" class="btn-edit">&#9998; Edit</a>
+                        <?php if ($u['Role'] === 'employee'): ?>
+                        <a href="?delete=<?php echo $u['UserID']; ?>" class="btn-del"
+                           onclick="return confirm('Deactivate this employee?')">&#10006; Remove</a>
+                        <?php endif; ?>
+                    </div>
                 </td>
             </tr>
             <?php endwhile; ?>

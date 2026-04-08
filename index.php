@@ -332,7 +332,9 @@
     <!-- Header -->
     <div class="header">
         <div class="header-content">
-            <div class="company-logo">🏢</div>
+            <img src="/leave-management/sterling_logo_2.png" 
+     alt="Sterling Assurance"
+     style="width: 5%; height: 5%; object-fit: contain;">
             <div class="company-info">
                 <h1>Sterling Assurance Nigeria Limited</h1>
                 <p>Leave Management System</p>
@@ -344,14 +346,14 @@
     <div class="container">
         <!-- Welcome Section -->
         <div class="welcome-section">
-            <h2>Welcome to Leave Management</h2>
+            <h2><marquee>Welcome to Leave Management</marquee></h2>
             <p>Select your portal below to access the leave management system</p>
         </div>
         
         <!-- Portal Cards -->
         <div class="portals-grid">
             <!-- Employee Portal -->
-            <a href="login.php" class="portal-card employee">
+            <a href="employee/login.php" class="portal-card employee">
                 <div class="portal-icon">👤</div>
                 <h3>Employee Portal</h3>
                 <p>Apply for leave, view balance, and track requests</p>

@@ -98,7 +98,7 @@ $stats      = sqlsrv_fetch_array($stats_stmt, SQLSRV_FETCH_ASSOC);
 <body>
 
 <div class="header">
-    <h1>&#128176; All Payments</h1>
+    <h1> All Payments</h1>
     <a href="../logout.php" class="btn-logout">Logout</a>
 </div>
 
