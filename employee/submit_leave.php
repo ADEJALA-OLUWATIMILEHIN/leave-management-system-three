@@ -24,6 +24,12 @@ $current_year = date('Y');
 $success = '';
 $error = '';
 
+
+// Fetch saved bank details for this employee
+$bank_sql  = "SELECT BankName, AccountNumber, AccountName FROM Users WHERE UserID = ?";
+$bank_stmt = sqlsrv_query($conn, $bank_sql, array($user_id));
+$bank_info = ($bank_stmt !== false) ? sqlsrv_fetch_array($bank_stmt, SQLSRV_FETCH_ASSOC) : null;
+
 // Fetch leave types
 $leave_types_sql = "SELECT LeaveTypeID, TypeName, MaxDaysPerYear FROM LeaveTypes WHERE IsActive = 1";
 $leave_types_stmt = sqlsrv_query($conn, $leave_types_sql);
@@ -85,6 +91,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $insert_stmt = sqlsrv_query($conn, $insert_sql, $insert_params);
                 
                 if ($insert_stmt) {
+
+                    // Save bank details if provided
+                    $bank_name      = sanitize_input($_POST['bank_name'] ?? '');
+                    $account_number = sanitize_input($_POST['account_number'] ?? '');
+                    $account_name   = sanitize_input($_POST['account_name'] ?? '');
+                    if (!empty($account_number)) {
+                        sqlsrv_query($conn,
+                            "UPDATE Users SET BankName=?, AccountNumber=?, AccountName=? WHERE UserID=?",
+                            array($bank_name, $account_number, $account_name, $user_id));
+                    }
+
                     // Get HOD email for this employee's department
                     $user_dept_sql = "SELECT Department FROM Users WHERE UserID = ?";
                     $user_dept_stmt = sqlsrv_query($conn, $user_dept_sql, array($user_id));
@@ -305,6 +322,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         #balance-display {
             font-weight: bold;
         }
+
+        .bank-section {
+            border: 2px dashed #d1d5db;
+            border-radius: 10px;
+            padding: 20px;
+            background: #fafafa;
+            margin-top: 10px;
+        }
+        .bank-section.annual-active {
+            border-color: #667eea;
+            background: #f5f3ff;
+        }
+        .annual-notice {
+            background: #ede9fe;
+            border-left: 4px solid #667eea;
+            border-radius: 7px;
+            padding: 11px 15px;
+            font-size: 13px;
+            color: #4c1d95;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .form-row-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+        @media(max-width:560px) { .form-row-2 { grid-template-columns: 1fr; } }
+        .saved-badge {
+            display: inline-block;
+            background: #d4edda;
+            color: #155724;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
     </style>
 </head>
 <body>
@@ -315,7 +370,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <a href="../logout.php" class="btn-logout">Logout</a>
         </div>
     </div>
-    
+ 
     <div class="container">
         <div class="section">
             <div class="section-header">
@@ -389,6 +444,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <small>Provide a brief explanation for your leave request</small>
                 </div>
                 
+
+                <!-- ── Bank Details for Payment ── -->
+                <div class="form-group" style="margin-top:10px;">
+                    <label style="font-size:15px;font-weight:600;color:#333;">
+                        &#127981; Bank Details for Leave Allowance Payment
+                    </label>
+                    <p style="font-size:13px;color:#666;margin:4px 0 12px 0;">
+                        Required for Annual Leave. Saved for all other leave types.
+                    </p>
+
+                    <div id="annual-notice" class="annual-notice">
+                        &#128176; <strong>Annual Leave selected</strong> — a leave allowance will be calculated after HR approval. Please ensure your bank details are correct.
+                    </div>
+
+                    <div class="bank-section" id="bank-section">
+                        <?php if (!empty($bank_info['AccountNumber'])): ?>
+                        <div class="saved-badge">&#9989; Saved bank details loaded</div>
+                        <?php endif; ?>
+
+                        <div class="form-group" style="margin-bottom:14px;">
+                            <label>Bank Name</label>
+                            <select name="bank_name">
+                                <option value="">-- Select bank --</option>
+                                <?php
+                                $banks = ['Access Bank','Citibank Nigeria','Ecobank Nigeria','Fidelity Bank',
+                                          'First Bank of Nigeria','First City Monument Bank (FCMB)',
+                                          'Guaranty Trust Bank (GTBank)','Heritage Bank','Keystone Bank',
+                                          'Polaris Bank','Providus Bank','Stanbic IBTC Bank',
+                                          'Standard Chartered Bank','Sterling Bank','SunTrust Bank',
+                                          'Union Bank of Nigeria','United Bank for Africa (UBA)',
+                                          'Unity Bank','Wema Bank','Zenith Bank'];
+                                foreach ($banks as $b) {
+                                    $sel = (($bank_info['BankName'] ?? '') === $b) ? 'selected' : '';
+                                    echo '<option value="' . htmlspecialchars($b) . '" ' . $sel . '>' . htmlspecialchars($b) . '</option>';
+                                }
+                                ?>
+                            </select>
+                        </div>
+
+                        <div class="form-row-2">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Account Number</label>
+                                <input type="text" name="account_number" maxlength="10"
+                                    placeholder="10-digit NUBAN number"
+                                    value="<?php echo htmlspecialchars($bank_info['AccountNumber'] ?? ''); ?>">
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Account Name</label>
+                                <input type="text" name="account_name"
+                                    placeholder="As it appears on your account"
+                                    value="<?php echo htmlspecialchars($bank_info['AccountName'] ?? ''); ?>">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Submit Request</button>
                     <a href="index.php" class="btn btn-secondary">Cancel</a>
@@ -416,6 +527,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Update end date minimum when start date changes
         document.getElementById('start_date').addEventListener('change', function() {
             document.getElementById('end_date').min = this.value;
+        });
+
+        // Show Annual Leave bank notice
+        document.getElementById('leave_type').addEventListener('change', function() {
+            const txt  = this.options[this.selectedIndex].text.toLowerCase();
+            const note = document.getElementById('annual-notice');
+            const sec  = document.getElementById('bank-section');
+            if (txt.includes('annual')) {
+                note.style.display = 'block';
+                sec.classList.add('annual-active');
+            } else {
+                note.style.display = 'none';
+                sec.classList.remove('annual-active');
+            }
         });
     </script>
 </body>

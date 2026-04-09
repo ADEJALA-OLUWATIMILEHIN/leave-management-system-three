@@ -21,6 +21,9 @@ $sql = "SELECT
             u.Department,
             u.EmployeeNumber,
             u.Salary,
+            u.BankName,
+            u.AccountNumber,
+            u.AccountName,
             lt.TypeName
         FROM LeaveRequests lr
         JOIN Users u ON lr.UserID = u.UserID
@@ -68,10 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($leave_type_check === 'annual leave' || $leave_type_check === 'annual') {
 
-                // Calculate leave allowance
-                $monthly_salary = $request['Salary'] ?? 100000;
-                $daily_rate     = $monthly_salary / 30;
-                $leave_allowance = round($daily_rate * $request['TotalDays'], 2);
+                // Leave allowance = full Salary amount (paid once, not per day)
+                $leave_allowance = round($request['Salary'] ?? 100000, 2);
 
                 // Check if payment already exists
                 $check_payment_sql  = "SELECT PaymentID FROM LeavePayments WHERE RequestID = ?";
@@ -89,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $leave_allowance,
                         $leave_allowance,
                         $_SESSION['user_id'],
-                        'Annual Leave allowance: ' . number_format($monthly_salary, 2) . ' / 30 x ' . $request['TotalDays'] . ' days = ' . number_format($leave_allowance, 2)
+                        'Annual Leave allowance paid in full: ' . number_format($leave_allowance, 2)
                     );
 
                     $payment_stmt = sqlsrv_query($conn, $payment_sql, $payment_params);
@@ -257,15 +258,14 @@ $payment      = sqlsrv_fetch_array($payment_stmt, SQLSRV_FETCH_ASSOC);
                 <?php
                 $leave_type_lower = strtolower(trim($request['TypeName']));
                 if ($leave_type_lower === 'annual leave' || $leave_type_lower === 'annual'):
-                    $monthly_salary  = $request['Salary'] ?? 100000;
-                    $leave_allowance_display = round(($monthly_salary / 30) * $request['TotalDays'], 2);
+                    $leave_allowance_display = $request['Salary'] ?? 100000;
                 ?>
                 <div class="info-item" style="background: #e8f5e9; border-left: 4px solid #28a745;">
-                    <label>Leave Allowance</label>
-                    <div class="value" style="font-size: 20px; color: #28a745; font-weight: 700;">
+                    <label>Leave Allowance (Full — Paid Once)</label>
+                    <div class="value" style="font-size: 22px; color: #28a745; font-weight: 700;">
                         &#8358;<?php echo number_format($leave_allowance_display, 2); ?>
                     </div>
-                    <small style="color: #666;">(&#8358;<?php echo number_format($monthly_salary, 2); ?> &divide; 30 &times; <?php echo $request['TotalDays']; ?> days)</small>
+                    <small style="color: #666;">Full annual leave allowance paid in one lump sum</small>
                 </div>
                 <?php endif; ?>
             </div>
@@ -376,6 +376,53 @@ $payment      = sqlsrv_fetch_array($payment_stmt, SQLSRV_FETCH_ASSOC);
                 <div class="info-item" style="margin-top: 15px; background: white;">
                     <label>Payment Notes</label>
                     <div class="value"><?php echo nl2br(htmlspecialchars($payment['HRNotes'])); ?></div>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
+
+        <!-- Bank Details (for HR and Finance visibility) -->
+        <?php
+        $has_bank = !empty($request['AccountNumber']);
+        $leave_type_for_bank = strtolower(trim($request['TypeName']));
+        ?>
+        <?php if ($has_bank || ($leave_type_for_bank === 'annual leave' || $leave_type_for_bank === 'annual')): ?>
+        <div class="card" style="border: 2px solid <?php echo $has_bank ? '#28a745' : '#ffc107'; ?>;">
+            <div style="padding:18px 26px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:10px;background:<?php echo $has_bank ? '#f0fff4' : '#fffbf0'; ?>;">
+                <div style="width:36px;height:36px;border-radius:9px;background:<?php echo $has_bank ? '#d4edda' : '#fff3cd'; ?>;display:flex;align-items:center;justify-content:center;font-size:18px;">&#127981;</div>
+                <h2 style="font-size:17px;color:#333;">Employee Bank Details (Payment Destination)</h2>
+                <?php if (!$has_bank): ?>
+                <span style="background:#fff3cd;color:#856404;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">&#9888; Not Provided</span>
+                <?php else: ?>
+                <span style="background:#d4edda;color:#155724;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">&#9989; On File</span>
+                <?php endif; ?>
+            </div>
+            <div style="padding:22px 26px;">
+                <?php if ($has_bank): ?>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;">
+                    <div style="padding:14px 16px;background:#f8f9fa;border-radius:9px;">
+                        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#888;font-weight:600;margin-bottom:5px;">Bank Name</label>
+                        <div style="font-size:15px;color:#222;font-weight:600;"><?php echo htmlspecialchars($request['BankName'] ?? '—'); ?></div>
+                    </div>
+                    <div style="padding:14px 16px;background:#f8f9fa;border-radius:9px;">
+                        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#888;font-weight:600;margin-bottom:5px;">Account Number</label>
+                        <div style="font-size:18px;color:#222;font-weight:700;font-family:monospace;letter-spacing:2px;"><?php echo htmlspecialchars($request['AccountNumber'] ?? '—'); ?></div>
+                    </div>
+                    <div style="padding:14px 16px;background:#f8f9fa;border-radius:9px;">
+                        <label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#888;font-weight:600;margin-bottom:5px;">Account Name</label>
+                        <div style="font-size:15px;color:#222;font-weight:600;"><?php echo htmlspecialchars($request['AccountName'] ?? '—'); ?></div>
+                    </div>
+                </div>
+                <p style="margin-top:14px;font-size:12px;color:#888;background:#f8f9fa;padding:10px 14px;border-radius:7px;">
+                    &#128276; This bank account will be used by Finance to process the leave allowance payment. Please verify it is correct before approving.
+                </p>
+                <?php else: ?>
+                <div style="text-align:center;padding:20px;color:#856404;background:#fffbf0;border-radius:9px;">
+                    <div style="font-size:32px;margin-bottom:10px;">&#9888;</div>
+                    <p><strong>Employee has not provided bank details.</strong></p>
+                    <p style="font-size:13px;margin-top:6px;">Please ask the employee to update their bank details in their portal before processing the leave allowance payment.</p>
                 </div>
                 <?php endif; ?>
             </div>

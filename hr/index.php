@@ -133,6 +133,7 @@ $message = get_message();
         <a href="payment_tracking.php"> Payments</a>
         <a href="manage_leave_types.php">Leave Types</a>
         <a href="reports.php">Reports</a>
+        <a href="recall_employee.php"> Recall</a>
         <a href="reports_export.php">Export</a>
         <a href="settings.php">Settings</a>
     </div>

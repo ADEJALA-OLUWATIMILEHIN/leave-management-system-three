@@ -12,6 +12,12 @@ if (!is_logged_in()) {
 $user_id = $_SESSION['user_id'];
 $user_name = $_SESSION['name'];
 
+
+// Get employee bank details
+$bank_sql  = "SELECT BankName, AccountNumber, AccountName FROM Users WHERE UserID = ?";
+$bank_stmt = sqlsrv_query($conn, $bank_sql, array($user_id));
+$bank_info = ($bank_stmt !== false) ? sqlsrv_fetch_array($bank_stmt, SQLSRV_FETCH_ASSOC) : null;
+
 // Get all leave requests with payment info
 $sql = "SELECT 
             lr.RequestID,
@@ -160,6 +166,7 @@ $stmt = sqlsrv_query($conn, $sql, array($user_id));
                         <th>HOD Status</th>
                         <th>HR Status</th>
                         <th>Payment</th>
+                        <th>Bank Account</th>
                         <th>Submitted</th>
                     </tr>
                 </thead>
@@ -168,8 +175,8 @@ $stmt = sqlsrv_query($conn, $sql, array($user_id));
                     <tr>
                         <td><strong><?php echo htmlspecialchars($req['LeaveType']); ?></strong></td>
                         <td>
-                            <?php echo $req['StartDate']->format('M d, Y'); ?> - 
-                            <?php echo $req['EndDate']->format('M d, Y'); ?>
+                            <?php echo ($req['StartDate'] instanceof DateTime) ? $req['StartDate']->format('M d, Y') : 'N/A'; ?> &ndash;
+                            <?php echo ($req['EndDate'] instanceof DateTime) ? $req['EndDate']->format('M d, Y') : 'N/A'; ?>
                         </td>
                         <td><?php echo $req['TotalDays']; ?> days</td>
                         <td>
@@ -190,7 +197,7 @@ $stmt = sqlsrv_query($conn, $sql, array($user_id));
                                 <span style="color: #999;">N/A</span>
                             <?php endif; ?>
                         </td>
-                        <td><?php echo $req['CreatedAt']->format('M d, Y'); ?></td>
+                        <td><?php echo ($req['CreatedAt'] instanceof DateTime) ? $req['CreatedAt']->format('M d, Y') : 'N/A'; ?></td>
                     </tr>
                     <?php endwhile; ?>
                 </tbody>

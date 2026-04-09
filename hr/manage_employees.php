@@ -170,7 +170,7 @@ $roles       = ['employee' => 'Employee', 'hod' => 'Head of Department', 'hr' =>
     <a href="index.php">Dashboard</a>
     <a href="all_requests.php">All Requests</a>
     <a href="manage_employees.php" class="active">Employees</a>
-    <a href="payment_tracking.php">&#128176; Payments</a>
+    <a href="payment_tracking.php"> Payments</a>
     <a href="calendar.php">Calendar</a>
     <a href="manage_leave_types.php">Leave Types</a>
     <a href="reports.php">Reports</a>

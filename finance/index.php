@@ -213,6 +213,7 @@ $message = get_message();
         <a href="index.php" class="active">Dashboard</a>
         <a href="all_payments.php">All Payments</a>
         <a href="payment_history.php">Payment History</a>
+       
     </div>
     
     <div class="container">

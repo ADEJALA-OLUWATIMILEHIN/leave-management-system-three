@@ -13,6 +13,12 @@ if (!is_logged_in()) {
 $user_id = $_SESSION['user_id'];
 $payment_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
+
+// Get employee bank details
+$bank_sql  = "SELECT BankName, AccountNumber, AccountName FROM Users WHERE UserID = ?";
+$bank_stmt = sqlsrv_query($conn, $bank_sql, array($user_id));
+$bank_info = ($bank_stmt !== false) ? sqlsrv_fetch_array($bank_stmt, SQLSRV_FETCH_ASSOC) : null;
+
 // Get payment details
 $sql = "SELECT 
             lp.PaymentID,
@@ -259,10 +265,39 @@ $user_name = $_SESSION['name'];
             
             <div class="leave-info">
                 <p><strong>Leave Type:</strong> <?php echo htmlspecialchars($payment['LeaveType']); ?></p>
-                <p><strong>Period:</strong> <?php echo $payment['StartDate']->format('M d, Y'); ?> - <?php echo $payment['EndDate']->format('M d, Y'); ?></p>
+                <p><strong>Period:</strong> <?php echo ($payment['StartDate'] instanceof DateTime) ? $payment['StartDate']->format('M d, Y') : 'N/A'; ?> - <?php echo ($payment['EndDate'] instanceof DateTime) ? $payment['EndDate']->format('M d, Y') : 'N/A'; ?></p>
                 <p><strong>Total Days:</strong> <?php echo $payment['TotalDays']; ?> days</p>
             </div>
             
+
+            <!-- Bank Details Box -->
+            <?php if (!empty($bank_info['AccountNumber'])): ?>
+            <div style="background:#e8f5e9;border:2px solid #28a745;border-radius:10px;padding:18px 22px;margin-bottom:24px;">
+                <h3 style="color:#155724;font-size:15px;margin-bottom:12px;">&#127981; Payment Will Be Sent To:</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;">
+                    <div>
+                        <div style="font-size:11px;color:#388e3c;text-transform:uppercase;letter-spacing:.8px;font-weight:600;">Bank</div>
+                        <div style="font-size:15px;font-weight:700;color:#1b5e20;"><?php echo htmlspecialchars($bank_info['BankName'] ?? '—'); ?></div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:#388e3c;text-transform:uppercase;letter-spacing:.8px;font-weight:600;">Account Number</div>
+                        <div style="font-size:20px;font-weight:800;font-family:monospace;letter-spacing:2px;color:#1b5e20;"><?php echo htmlspecialchars($bank_info['AccountNumber']); ?></div>
+                    </div>
+                    <div>
+                        <div style="font-size:11px;color:#388e3c;text-transform:uppercase;letter-spacing:.8px;font-weight:600;">Account Name</div>
+                        <div style="font-size:15px;font-weight:700;color:#1b5e20;"><?php echo htmlspecialchars($bank_info['AccountName'] ?? '—'); ?></div>
+                    </div>
+                </div>
+                <p style="margin-top:12px;font-size:12px;color:#388e3c;">&#9432; If these details are incorrect, please update them in your <a href="index.php" style="color:#155724;font-weight:700;">dashboard</a> before proceeding.</p>
+            </div>
+            <?php else: ?>
+            <div style="background:#fff3cd;border:2px solid #ffc107;border-radius:10px;padding:18px 22px;margin-bottom:24px;">
+                <h3 style="color:#856404;font-size:15px;margin-bottom:8px;">&#9888; No Bank Details Found</h3>
+                <p style="color:#856404;font-size:14px;">Please update your bank details before requesting payment so Finance knows where to send your allowance.</p>
+                <a href="index.php" style="display:inline-block;margin-top:10px;padding:8px 16px;background:#ffc107;color:#333;border-radius:6px;font-weight:700;text-decoration:none;font-size:13px;">Update Bank Details</a>
+            </div>
+            <?php endif; ?>
+
             <div class="amount-display">
                 <h3>Total Leave Allowance</h3>
                 <div class="amount">₦<?php echo number_format($payment['Amount'], 2); ?></div>

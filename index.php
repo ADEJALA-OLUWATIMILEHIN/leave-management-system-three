@@ -337,7 +337,7 @@
      style="width: 5%; height: 5%; object-fit: contain;">
             <div class="company-info">
                 <h1>Sterling Assurance Nigeria Limited</h1>
-                <p>Leave Management System</p>
+                <p>Leave Management System By Sterling Assurance IT Department</p>
             </div>
         </div>
     </div>

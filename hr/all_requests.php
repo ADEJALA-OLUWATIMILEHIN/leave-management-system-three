@@ -62,6 +62,7 @@ $message = get_message();
         .badge-pending { background: #fff3cd; color: #856404; }
         .badge-approved { background: #d4edda; color: #155724; }
         .badge-rejected { background: #f8d7da; color: #721c24; }
+        .badge-recalled { background: #f8d7da; color: #721c24; }
         .btn-action { padding: 6px 12px; border: none; border-radius: 4px; font-size: 12px; text-decoration: none; display: inline-block; color: white; background: #00f2fe; }
     </style>
 </head>
@@ -73,12 +74,14 @@ $message = get_message();
     
     <div class="nav-menu">
     <a href="index.php">Dashboard</a>
-    <a href="all_requests.php">All Requests</a>
+    <a href="all_requests.php" class="active">All Requests</a>
     <a href="manage_employees.php">Manage Employees</a>
     <a href="calendar.php">Calendar</a>
+    <a href="payment_tracking.php"> Payments</a>
     <a href="manage_leave_types.php">Leave Types</a>
     <a href="reports.php">Reports</a>
-    <a href="reports_export.php">Export</a>  
+    <a href="recall_employee.php"> Recall</a>
+    <a href="reports_export.php">Export</a>
     <a href="settings.php">Settings</a>
 </div>
     
@@ -109,8 +112,8 @@ $message = get_message();
                             <td><?php echo htmlspecialchars($request['Department']); ?></td>
                             <td><?php echo htmlspecialchars($request['TypeName']); ?></td>
                             <td>
-                                <?php echo $request['StartDate']->format('M d'); ?> - 
-                                <?php echo $request['EndDate']->format('M d, Y'); ?>
+                                <?php echo ($request['StartDate'] instanceof DateTime) ? $request['StartDate']->format('M d') : 'N/A'; ?> &ndash;
+                                <?php echo ($request['EndDate'] instanceof DateTime) ? $request['EndDate']->format('M d, Y') : 'N/A'; ?>
                             </td>
                             <td><?php echo $request['TotalDays']; ?></td>
                             <td>
@@ -123,7 +126,7 @@ $message = get_message();
                                     <?php echo ucfirst($request['HRApprovalStatus']); ?>
                                 </span>
                             </td>
-                            <td><?php echo $request['CreatedAt']->format('M d, Y'); ?></td>
+                            <td><?php echo ($request['CreatedAt'] instanceof DateTime) ? $request['CreatedAt']->format('M d, Y') : 'N/A'; ?></td>
                             <td>
                                 <a href="review_request.php?id=<?php echo $request['RequestID']; ?>" class="btn-action">View</a>
                             </td>
